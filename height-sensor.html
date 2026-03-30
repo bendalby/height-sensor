@@ -303,7 +303,7 @@
 
   <!-- Height -->
   <div class="card height-card">
-    <div class="card-label">Height from ground</div>
+    <div class="card-label">Height change (IMU est.)</div>
     <div class="height-value unavailable" id="heightVal">—</div>
     <div class="height-unit">mm</div>
   </div>
@@ -329,6 +329,7 @@
     <div class="accel-row">ay <span id="ayVal">—</span></div>
     <div class="accel-row">az <span id="azVal">—</span></div>
     <div class="accel-row" style="margin-top:8px;">pwm <span id="pwmVal">—</span></div>
+    <div class="accel-row">velZ <span id="velZVal">—</span> m/s</div>
   </div>
 
   <!-- Controls -->
@@ -337,6 +338,7 @@
     <button class="btn btn-start"   id="btnStart"   onclick="startSession()" disabled>Start Session</button>
     <button class="btn btn-stop"    id="btnStop"    onclick="stopSession()"  disabled>Stop Session</button>
     <button class="btn btn-download" id="btnDownload" onclick="downloadCSV()" disabled>Download CSV</button>
+    <button class="btn" id="btnReset" onclick="resetHeight()" disabled>Reset Height</button>
   </div>
 
   <!-- Log preview -->
@@ -400,6 +402,7 @@
     setStatus('CONNECTED', true);
     document.getElementById('btnConnect').textContent = 'Disconnect';
     document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnReset').disabled = false;
   }
 
   function onDisconnected() {
@@ -407,17 +410,18 @@
     document.getElementById('btnConnect').textContent = 'Connect';
     document.getElementById('btnStart').disabled = true;
     document.getElementById('btnStop').disabled  = true;
+    document.getElementById('btnReset').disabled = true;
     if (sessionActive) stopSession();
   }
 
   // ── Incoming data ─────────────────────────────────────────────────────────
-  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height
+  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height,velZ,heightDelta_mm
   function onData(event) {
     const raw = new TextDecoder().decode(event.target.value);
     const parts = raw.trim().split(',');
-    if (parts.length < 9) return;
+    if (parts.length < 11) return;
 
-    const [ts, ax, ay, az, angle, isVert, tof, pwm, height] = parts;
+    const [ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta] = parts;
 
     // Update live display
     document.getElementById('angleVal').textContent = parseFloat(angle).toFixed(1) + '°';
@@ -425,25 +429,21 @@
     document.getElementById('ayVal').textContent = parseFloat(ay).toFixed(3);
     document.getElementById('azVal').textContent = parseFloat(az).toFixed(3);
     document.getElementById('pwmVal').textContent = pwm;
+    document.getElementById('velZVal').textContent = parseFloat(velZ).toFixed(3);
 
     const vertical = isVert === '1';
     const badge = document.getElementById('verticalBadge');
     badge.textContent = vertical ? 'Sensor vertical ✓' : 'Sensor angled';
     badge.className   = 'vertical-badge' + (vertical ? ' active' : '');
 
-    const h = parseInt(height);
     const hEl = document.getElementById('heightVal');
-    if (h >= 0) {
-      hEl.textContent = h;
-      hEl.className = 'height-value';
-    } else {
-      hEl.textContent = '—';
-      hEl.className = 'height-value unavailable';
-    }
+    const hd = parseFloat(heightDelta);
+    hEl.textContent = (hd >= 0 ? '+' : '') + hd.toFixed(1);
+    hEl.className = 'height-value';
 
     // Record if session active
     if (sessionActive) {
-      sessionRows.push([ts, ax, ay, az, angle, isVert, tof, pwm, height]);
+      sessionRows.push([ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta]);
       updateLog(raw.trim());
       document.getElementById('sampleCount').textContent =
         sessionRows.length + ' sample' + (sessionRows.length !== 1 ? 's' : '') + ' recorded';
@@ -490,9 +490,15 @@
     meta.textContent = '— ' + sessionRows.length + ' rows, session ended ' + new Date().toLocaleTimeString();
   }
 
+  // ── Reset height ──────────────────────────────────────────────────────────
+  function resetHeight() {
+    sendCmd('R');
+    document.getElementById('heightVal').textContent = '+0.0';
+  }
+
   // ── CSV download ──────────────────────────────────────────────────────────
   function downloadCSV() {
-    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm';
+    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm,vel_z_ms,height_delta_mm';
     const csv = [header, ...sessionRows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
