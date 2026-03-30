@@ -324,12 +324,28 @@
 
   <!-- Raw accel -->
   <div class="card">
-    <div class="card-label">Accelerometer</div>
+    <div class="card-label">Accelerometer (raw)</div>
     <div class="accel-row">ax <span id="axVal">—</span></div>
     <div class="accel-row">ay <span id="ayVal">—</span></div>
     <div class="accel-row">az <span id="azVal">—</span></div>
     <div class="accel-row" style="margin-top:8px;">pwm <span id="pwmVal">—</span></div>
     <div class="accel-row">velZ <span id="velZVal">—</span> m/s</div>
+  </div>
+
+  <!-- Orientation -->
+  <div class="card">
+    <div class="card-label">Orientation (AHRS)</div>
+    <div class="accel-row">roll  <span id="rollVal">—</span> °</div>
+    <div class="accel-row">pitch <span id="pitchVal">—</span> °</div>
+    <div class="accel-row">yaw   <span id="yawVal">—</span> °</div>
+  </div>
+
+  <!-- Earth-frame accel -->
+  <div class="card">
+    <div class="card-label">Earth-frame accel (gravity removed)</div>
+    <div class="accel-row">east  (X) <span id="eaxVal">—</span> g</div>
+    <div class="accel-row">north (Y) <span id="eayVal">—</span> g</div>
+    <div class="accel-row">up    (Z) <span id="eazVal">—</span> g</div>
   </div>
 
   <!-- Controls -->
@@ -415,13 +431,14 @@
   }
 
   // ── Incoming data ─────────────────────────────────────────────────────────
-  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height,velZ,heightDelta_mm
+  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height,velZ,heightDelta_mm,roll,pitch,yaw,eax,eay,eaz
   function onData(event) {
     const raw = new TextDecoder().decode(event.target.value);
     const parts = raw.trim().split(',');
     if (parts.length < 11) return;
 
-    const [ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta] = parts;
+    const [ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta,
+           roll, pitch, yaw, eax, eay, eaz] = parts;
 
     // Update live display
     document.getElementById('angleVal').textContent = parseFloat(angle).toFixed(1) + '°';
@@ -430,6 +447,15 @@
     document.getElementById('azVal').textContent = parseFloat(az).toFixed(3);
     document.getElementById('pwmVal').textContent = pwm;
     document.getElementById('velZVal').textContent = parseFloat(velZ).toFixed(3);
+
+    if (roll !== undefined) {
+      document.getElementById('rollVal').textContent  = parseFloat(roll).toFixed(1);
+      document.getElementById('pitchVal').textContent = parseFloat(pitch).toFixed(1);
+      document.getElementById('yawVal').textContent   = parseFloat(yaw).toFixed(1);
+      document.getElementById('eaxVal').textContent   = parseFloat(eax).toFixed(3);
+      document.getElementById('eayVal').textContent   = parseFloat(eay).toFixed(3);
+      document.getElementById('eazVal').textContent   = parseFloat(eaz).toFixed(3);
+    }
 
     const vertical = isVert === '1';
     const badge = document.getElementById('verticalBadge');
@@ -498,7 +524,7 @@
 
   // ── CSV download ──────────────────────────────────────────────────────────
   function downloadCSV() {
-    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm,vel_z_ms,height_delta_mm';
+    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm,vel_z_ms,height_delta_mm,roll_deg,pitch_deg,yaw_deg,earth_ax_g,earth_ay_g,earth_az_g';
     const csv = [header, ...sessionRows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
