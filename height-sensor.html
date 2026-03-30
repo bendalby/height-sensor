@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Height Sensor</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Barlow+Condensed:wght@300;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #080c0a;
+      --surface:  #0f1612;
+      --border:   #1e2e24;
+      --green:    #00e87a;
+      --green-dim:#007a40;
+      --amber:    #ffb400;
+      --red:      #ff3c3c;
+      --text:     #c8d8cc;
+      --muted:    #4a6354;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-ui:   'Barlow Condensed', sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-mono);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 14px;
+      margin-bottom: 24px;
+    }
+
+    .logo {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 1.5rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .logo span { color: var(--muted); font-weight: 300; }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-family: var(--font-ui);
+      font-weight: 600;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+
+    .dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot.recording { background: var(--red); box-shadow: 0 0 8px var(--red); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto auto;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 20px;
+    }
+
+    .card-label {
+      font-family: var(--font-ui);
+      font-weight: 600;
+      font-size: 0.65rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Height display ── */
+    .height-card {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 32px 20px;
+    }
+
+    .height-value {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 5rem;
+      color: var(--green);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      transition: color 0.3s;
+    }
+
+    .height-value.unavailable { color: var(--muted); }
+
+    .height-unit {
+      font-family: var(--font-ui);
+      font-weight: 300;
+      font-size: 1.4rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* ── Angle display ── */
+    .angle-value {
+      font-size: 2rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .vertical-badge {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 3px 10px;
+      border-radius: 2px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: var(--border);
+      color: var(--muted);
+      transition: all 0.2s;
+    }
+
+    .vertical-badge.active {
+      background: color-mix(in srgb, var(--green) 15%, transparent);
+      color: var(--green);
+      border: 1px solid var(--green-dim);
+    }
+
+    /* ── Timer ── */
+    .timer-value {
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--amber);
+      letter-spacing: 0.05em;
+    }
+
+    .timer-value.idle { color: var(--muted); }
+
+    /* ── Accel raw ── */
+    .accel-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .accel-row span { color: var(--text); }
+
+    /* ── Buttons ── */
+    .controls {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 20px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: transparent;
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:hover:not(:disabled) {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .btn-connect {
+      border-color: var(--green-dim);
+      color: var(--green);
+    }
+
+    .btn-connect:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--green) 10%, transparent);
+    }
+
+    .btn-start {
+      border-color: var(--green-dim);
+    }
+
+    .btn-stop {
+      border-color: #ff3c3c44;
+      color: var(--red);
+    }
+
+    .btn-stop:hover:not(:disabled) {
+      border-color: var(--red);
+      background: color-mix(in srgb, var(--red) 10%, transparent);
+    }
+
+    .btn-download {
+      border-color: #ffb40044;
+      color: var(--amber);
+    }
+
+    .btn-download:hover:not(:disabled) {
+      border-color: var(--amber);
+      background: color-mix(in srgb, var(--amber) 10%, transparent);
+    }
+
+    /* ── Log ── */
+    .log-card {
+      grid-column: 1 / -1;
+    }
+
+    .log-meta {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .log-preview {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 2px;
+      padding: 10px;
+      height: 100px;
+      overflow-y: auto;
+      font-size: 0.65rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .log-preview .log-row { color: var(--text); }
+    .log-preview .log-row:last-child { color: var(--green); }
+
+    /* ── Notice ── */
+    .notice {
+      grid-column: 1 / -1;
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      padding: 8px;
+      border: 1px dashed var(--border);
+      border-radius: 3px;
+    }
+
+    .notice a { color: var(--green-dim); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Height<span>Sensor</span></div>
+  <div class="status-pill">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">DISCONNECTED</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Height -->
+  <div class="card height-card">
+    <div class="card-label">Height from ground</div>
+    <div class="height-value unavailable" id="heightVal">—</div>
+    <div class="height-unit">mm</div>
+  </div>
+
+  <!-- Angle -->
+  <div class="card">
+    <div class="card-label">Angle from vertical</div>
+    <div class="angle-value" id="angleVal">—°</div>
+    <div class="vertical-badge" id="verticalBadge">Sensor horizontal</div>
+  </div>
+
+  <!-- Timer -->
+  <div class="card">
+    <div class="card-label">Session timer</div>
+    <div class="timer-value idle" id="timerVal">00:00:00</div>
+    <div style="font-size:0.68rem; color:var(--muted); margin-top:8px;" id="sampleCount">0 samples recorded</div>
+  </div>
+
+  <!-- Raw accel -->
+  <div class="card">
+    <div class="card-label">Accelerometer</div>
+    <div class="accel-row">ax <span id="axVal">—</span></div>
+    <div class="accel-row">ay <span id="ayVal">—</span></div>
+    <div class="accel-row">az <span id="azVal">—</span></div>
+    <div class="accel-row" style="margin-top:8px;">pwm <span id="pwmVal">—</span></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-connect" id="btnConnect" onclick="toggleConnect()">Connect</button>
+    <button class="btn btn-start"   id="btnStart"   onclick="startSession()" disabled>Start Session</button>
+    <button class="btn btn-stop"    id="btnStop"    onclick="stopSession()"  disabled>Stop Session</button>
+    <button class="btn btn-download" id="btnDownload" onclick="downloadCSV()" disabled>Download CSV</button>
+  </div>
+
+  <!-- Log preview -->
+  <div class="card log-card">
+    <div class="card-label">Session log <span class="log-meta" id="logMeta"></span></div>
+    <div class="log-preview" id="logPreview">Waiting for session...</div>
+  </div>
+
+  <!-- Notice -->
+  <div class="notice">
+    Requires Chrome on Android or desktop &mdash; Web Bluetooth is not supported in Safari or Firefox.
+    Host this file over HTTPS or <code>localhost</code>.
+  </div>
+
+</div>
+
+<script>
+  // ── BLE config ────────────────────────────────────────────────────────────
+  const SERVICE_UUID  = '19b10000-e8f2-537e-4f6c-d104768a1214';
+  const DATA_UUID     = '19b10001-e8f2-537e-4f6c-d104768a1214';
+  const CMD_UUID      = '19b10002-e8f2-537e-4f6c-d104768a1214';
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let device, dataChar, cmdChar;
+  let sessionRows = [];
+  let sessionActive = false;
+  let sessionStart = null;
+  let timerInterval = null;
+
+  // ── BLE connect/disconnect ────────────────────────────────────────────────
+  async function toggleConnect() {
+    if (device && device.gatt.connected) {
+      device.gatt.disconnect();
+      return;
+    }
+    try {
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ name: 'HeightSensor' }],
+        optionalServices: [SERVICE_UUID]
+      });
+
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+
+      const server  = await device.gatt.connect();
+      const service = await server.getPrimaryService(SERVICE_UUID);
+
+      dataChar = await service.getCharacteristic(DATA_UUID);
+      cmdChar  = await service.getCharacteristic(CMD_UUID);
+
+      await dataChar.startNotifications();
+      dataChar.addEventListener('characteristicvaluechanged', onData);
+
+      onConnected();
+    } catch (e) {
+      console.error(e);
+      setStatus('ERROR', false);
+    }
+  }
+
+  function onConnected() {
+    setStatus('CONNECTED', true);
+    document.getElementById('btnConnect').textContent = 'Disconnect';
+    document.getElementById('btnStart').disabled = false;
+  }
+
+  function onDisconnected() {
+    setStatus('DISCONNECTED', false);
+    document.getElementById('btnConnect').textContent = 'Connect';
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled  = true;
+    if (sessionActive) stopSession();
+  }
+
+  // ── Incoming data ─────────────────────────────────────────────────────────
+  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height
+  function onData(event) {
+    const raw = new TextDecoder().decode(event.target.value);
+    const parts = raw.trim().split(',');
+    if (parts.length < 9) return;
+
+    const [ts, ax, ay, az, angle, isVert, tof, pwm, height] = parts;
+
+    // Update live display
+    document.getElementById('angleVal').textContent = parseFloat(angle).toFixed(1) + '°';
+    document.getElementById('axVal').textContent = parseFloat(ax).toFixed(3);
+    document.getElementById('ayVal').textContent = parseFloat(ay).toFixed(3);
+    document.getElementById('azVal').textContent = parseFloat(az).toFixed(3);
+    document.getElementById('pwmVal').textContent = pwm;
+
+    const vertical = isVert === '1';
+    const badge = document.getElementById('verticalBadge');
+    badge.textContent = vertical ? 'Sensor vertical ✓' : 'Sensor angled';
+    badge.className   = 'vertical-badge' + (vertical ? ' active' : '');
+
+    const h = parseInt(height);
+    const hEl = document.getElementById('heightVal');
+    if (h >= 0) {
+      hEl.textContent = h;
+      hEl.className = 'height-value';
+    } else {
+      hEl.textContent = '—';
+      hEl.className = 'height-value unavailable';
+    }
+
+    // Record if session active
+    if (sessionActive) {
+      sessionRows.push([ts, ax, ay, az, angle, isVert, tof, pwm, height]);
+      updateLog(raw.trim());
+      document.getElementById('sampleCount').textContent =
+        sessionRows.length + ' sample' + (sessionRows.length !== 1 ? 's' : '') + ' recorded';
+    }
+  }
+
+  // ── Session control ───────────────────────────────────────────────────────
+  function startSession() {
+    sessionRows = [];
+    sessionActive = true;
+    sessionStart = Date.now();
+
+    document.getElementById('btnStart').disabled    = true;
+    document.getElementById('btnStop').disabled     = false;
+    document.getElementById('btnDownload').disabled = true;
+    document.getElementById('sampleCount').textContent = '0 samples recorded';
+    document.getElementById('logPreview').innerHTML = '';
+    document.getElementById('timerVal').className = 'timer-value';
+
+    timerInterval = setInterval(updateTimer, 1000);
+
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot recording';
+    document.getElementById('statusText').textContent = 'RECORDING';
+
+    sendCmd('START');
+  }
+
+  function stopSession() {
+    sessionActive = false;
+    clearInterval(timerInterval);
+
+    document.getElementById('btnStart').disabled    = false;
+    document.getElementById('btnStop').disabled     = true;
+    document.getElementById('btnDownload').disabled = sessionRows.length === 0;
+
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot connected';
+    document.getElementById('statusText').textContent = 'CONNECTED';
+
+    sendCmd('STOP');
+
+    const meta = document.getElementById('logMeta');
+    meta.textContent = '— ' + sessionRows.length + ' rows, session ended ' + new Date().toLocaleTimeString();
+  }
+
+  // ── CSV download ──────────────────────────────────────────────────────────
+  function downloadCSV() {
+    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm';
+    const csv = [header, ...sessionRows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'height-session-' + new Date().toISOString().replace(/[:.]/g, '-') + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  async function sendCmd(cmd) {
+    if (!cmdChar) return;
+    try {
+      const enc = new TextEncoder().encode(cmd);
+      await cmdChar.writeValue(enc);
+    } catch (e) { console.warn('CMD write failed:', e); }
+  }
+
+  function setStatus(text, connected) {
+    document.getElementById('statusText').textContent = text;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot' + (connected ? ' connected' : '');
+  }
+
+  function updateTimer() {
+    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    document.getElementById('timerVal').textContent = `${h}:${m}:${s}`;
+  }
+
+  function updateLog(row) {
+    const log = document.getElementById('logPreview');
+    const div = document.createElement('div');
+    div.className = 'log-row';
+    div.textContent = row;
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+    // Keep preview to last 200 rows
+    while (log.children.length > 200) log.removeChild(log.firstChild);
+  }
+</script>
+
+</body>
+</html>
