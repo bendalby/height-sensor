@@ -301,9 +301,9 @@
 
 <div class="grid">
 
-  <!-- Height -->
+  <!-- TOF Height -->
   <div class="card height-card">
-    <div class="card-label">Height change (IMU est.)</div>
+    <div class="card-label">TOF Distance</div>
     <div class="height-value unavailable" id="heightVal">—</div>
     <div class="height-unit">mm</div>
   </div>
@@ -315,6 +315,15 @@
     <div class="vertical-badge" id="verticalBadge">Sensor horizontal</div>
   </div>
 
+  <!-- Orientation -->
+  <div class="card">
+    <div class="card-label">Orientation (AHRS)</div>
+    <div class="accel-row">roll  <span id="rollVal">—</span> °</div>
+    <div class="accel-row">pitch <span id="pitchVal">—</span> °</div>
+    <div class="accel-row">yaw   <span id="yawVal">—</span> °</div>
+    <div class="accel-row" style="margin-top:8px;">motor pwm <span id="pwmVal">—</span></div>
+  </div>
+
   <!-- Timer -->
   <div class="card">
     <div class="card-label">Session timer</div>
@@ -322,39 +331,12 @@
     <div style="font-size:0.68rem; color:var(--muted); margin-top:8px;" id="sampleCount">0 samples recorded</div>
   </div>
 
-  <!-- Raw accel -->
-  <div class="card">
-    <div class="card-label">Accelerometer (raw)</div>
-    <div class="accel-row">ax <span id="axVal">—</span></div>
-    <div class="accel-row">ay <span id="ayVal">—</span></div>
-    <div class="accel-row">az <span id="azVal">—</span></div>
-    <div class="accel-row" style="margin-top:8px;">pwm <span id="pwmVal">—</span></div>
-    <div class="accel-row">velZ <span id="velZVal">—</span> m/s</div>
-  </div>
-
-  <!-- Orientation -->
-  <div class="card">
-    <div class="card-label">Orientation (AHRS)</div>
-    <div class="accel-row">roll  <span id="rollVal">—</span> °</div>
-    <div class="accel-row">pitch <span id="pitchVal">—</span> °</div>
-    <div class="accel-row">yaw   <span id="yawVal">—</span> °</div>
-  </div>
-
-  <!-- Earth-frame accel -->
-  <div class="card">
-    <div class="card-label">Earth-frame accel (gravity removed)</div>
-    <div class="accel-row">east  (X) <span id="eaxVal">—</span> g</div>
-    <div class="accel-row">north (Y) <span id="eayVal">—</span> g</div>
-    <div class="accel-row">up    (Z) <span id="eazVal">—</span> g</div>
-  </div>
-
   <!-- Controls -->
   <div class="controls">
-    <button class="btn btn-connect" id="btnConnect" onclick="toggleConnect()">Connect</button>
-    <button class="btn btn-start"   id="btnStart"   onclick="startSession()" disabled>Start Session</button>
-    <button class="btn btn-stop"    id="btnStop"    onclick="stopSession()"  disabled>Stop Session</button>
-    <button class="btn btn-download" id="btnDownload" onclick="downloadCSV()" disabled>Download CSV</button>
-    <button class="btn" id="btnReset" onclick="resetHeight()" disabled>Reset Height</button>
+    <button class="btn btn-connect"  id="btnConnect"  onclick="toggleConnect()">Connect</button>
+    <button class="btn btn-start"    id="btnStart"    onclick="startSession()" disabled>Start Session</button>
+    <button class="btn btn-stop"     id="btnStop"     onclick="stopSession()"  disabled>Stop Session</button>
+    <button class="btn btn-download" id="btnDownload" onclick="downloadCSV()"  disabled>Download CSV</button>
   </div>
 
   <!-- Log preview -->
@@ -418,7 +400,6 @@
     setStatus('CONNECTED', true);
     document.getElementById('btnConnect').textContent = 'Disconnect';
     document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnReset').disabled = false;
   }
 
   function onDisconnected() {
@@ -426,36 +407,23 @@
     document.getElementById('btnConnect').textContent = 'Connect';
     document.getElementById('btnStart').disabled = true;
     document.getElementById('btnStop').disabled  = true;
-    document.getElementById('btnReset').disabled = true;
     if (sessionActive) stopSession();
   }
 
   // ── Incoming data ─────────────────────────────────────────────────────────
-  // Format: timestamp,ax,ay,az,angle,isVertical,tofDist,motorPWM,height,velZ,heightDelta_mm,roll,pitch,yaw,eax,eay,eaz
+  // Format: timestamp,roll,pitch,yaw,angle,isVertical,tofDist,motorPWM
   function onData(event) {
     const raw = new TextDecoder().decode(event.target.value);
     const parts = raw.trim().split(',');
-    if (parts.length < 11) return;
+    if (parts.length < 8) return;
 
-    const [ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta,
-           roll, pitch, yaw, eax, eay, eaz] = parts;
+    const [ts, roll, pitch, yaw, angle, isVert, tofDist, pwm] = parts;
 
-    // Update live display
+    document.getElementById('rollVal').textContent  = parseFloat(roll).toFixed(1);
+    document.getElementById('pitchVal').textContent = parseFloat(pitch).toFixed(1);
+    document.getElementById('yawVal').textContent   = parseFloat(yaw).toFixed(1);
     document.getElementById('angleVal').textContent = parseFloat(angle).toFixed(1) + '°';
-    document.getElementById('axVal').textContent = parseFloat(ax).toFixed(3);
-    document.getElementById('ayVal').textContent = parseFloat(ay).toFixed(3);
-    document.getElementById('azVal').textContent = parseFloat(az).toFixed(3);
-    document.getElementById('pwmVal').textContent = pwm;
-    document.getElementById('velZVal').textContent = parseFloat(velZ).toFixed(3);
-
-    if (roll !== undefined) {
-      document.getElementById('rollVal').textContent  = parseFloat(roll).toFixed(1);
-      document.getElementById('pitchVal').textContent = parseFloat(pitch).toFixed(1);
-      document.getElementById('yawVal').textContent   = parseFloat(yaw).toFixed(1);
-      document.getElementById('eaxVal').textContent   = parseFloat(eax).toFixed(3);
-      document.getElementById('eayVal').textContent   = parseFloat(eay).toFixed(3);
-      document.getElementById('eazVal').textContent   = parseFloat(eaz).toFixed(3);
-    }
+    document.getElementById('pwmVal').textContent   = pwm;
 
     const vertical = isVert === '1';
     const badge = document.getElementById('verticalBadge');
@@ -463,13 +431,17 @@
     badge.className   = 'vertical-badge' + (vertical ? ' active' : '');
 
     const hEl = document.getElementById('heightVal');
-    const hd = parseFloat(heightDelta);
-    hEl.textContent = (hd >= 0 ? '+' : '') + hd.toFixed(1);
-    hEl.className = 'height-value';
+    const dist = parseInt(tofDist);
+    if (dist > 0) {
+      hEl.textContent = dist;
+      hEl.className = 'height-value';
+    } else {
+      hEl.textContent = '—';
+      hEl.className = 'height-value unavailable';
+    }
 
-    // Record if session active
     if (sessionActive) {
-      sessionRows.push([ts, ax, ay, az, angle, isVert, tof, pwm, height, velZ, heightDelta]);
+      sessionRows.push([ts, roll, pitch, yaw, angle, isVert, tofDist, pwm]);
       updateLog(raw.trim());
       document.getElementById('sampleCount').textContent =
         sessionRows.length + ' sample' + (sessionRows.length !== 1 ? 's' : '') + ' recorded';
@@ -516,15 +488,9 @@
     meta.textContent = '— ' + sessionRows.length + ' rows, session ended ' + new Date().toLocaleTimeString();
   }
 
-  // ── Reset height ──────────────────────────────────────────────────────────
-  function resetHeight() {
-    sendCmd('R');
-    document.getElementById('heightVal').textContent = '+0.0';
-  }
-
   // ── CSV download ──────────────────────────────────────────────────────────
   function downloadCSV() {
-    const header = 'timestamp_ms,ax,ay,az,angle_deg,is_vertical,tof_dist_mm,motor_pwm,height_mm,vel_z_ms,height_delta_mm,roll_deg,pitch_deg,yaw_deg,earth_ax_g,earth_ay_g,earth_az_g';
+    const header = 'timestamp_ms,roll_deg,pitch_deg,yaw_deg,angle_deg,is_vertical,tof_dist_mm,motor_pwm';
     const csv = [header, ...sessionRows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
