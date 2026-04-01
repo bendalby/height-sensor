@@ -126,6 +126,7 @@
     }
 
     .height-value.unavailable { color: var(--muted); }
+    .height-value.ballistic   { color: var(--amber); }
 
     .height-unit {
       font-family: var(--font-ui);
@@ -322,6 +323,15 @@
     <div class="accel-row">pitch <span id="pitchVal">—</span> °</div>
     <div class="accel-row">yaw   <span id="yawVal">—</span> °</div>
     <div class="accel-row" style="margin-top:8px;">motor pwm <span id="pwmVal">—</span></div>
+    <div class="accel-row">fall state <span id="fallVal">—</span></div>
+  </div>
+
+  <!-- Accelerometer -->
+  <div class="card">
+    <div class="card-label">Accelerometer (raw g)</div>
+    <div class="accel-row">ax <span id="axVal">—</span></div>
+    <div class="accel-row">ay <span id="ayVal">—</span></div>
+    <div class="accel-row">az <span id="azVal">—</span></div>
   </div>
 
   <!-- Timer -->
@@ -411,19 +421,25 @@
   }
 
   // ── Incoming data ─────────────────────────────────────────────────────────
-  // Format: timestamp,roll,pitch,yaw,angle,isVertical,tofDist,motorPWM
+  // Format: timestamp,roll,pitch,yaw,angle,isVertical,height,motorPWM,fallState,ax,ay,az
   function onData(event) {
     const raw = new TextDecoder().decode(event.target.value);
     const parts = raw.trim().split(',');
-    if (parts.length < 8) return;
+    if (parts.length < 12) return;
 
-    const [ts, roll, pitch, yaw, angle, isVert, tofDist, pwm] = parts;
+    const [ts, roll, pitch, yaw, angle, isVert, height, pwm, fallState, ax, ay, az] = parts;
 
     document.getElementById('rollVal').textContent  = parseFloat(roll).toFixed(1);
     document.getElementById('pitchVal').textContent = parseFloat(pitch).toFixed(1);
     document.getElementById('yawVal').textContent   = parseFloat(yaw).toFixed(1);
     document.getElementById('angleVal').textContent = parseFloat(angle).toFixed(1) + '°';
     document.getElementById('pwmVal').textContent   = pwm;
+    document.getElementById('axVal').textContent    = parseFloat(ax).toFixed(3);
+    document.getElementById('ayVal').textContent    = parseFloat(ay).toFixed(3);
+    document.getElementById('azVal').textContent    = parseFloat(az).toFixed(3);
+
+    const fallLabels = ['NORMAL', 'FREEFALL', 'BALLISTIC'];
+    document.getElementById('fallVal').textContent = fallLabels[parseInt(fallState)] || '—';
 
     const vertical = isVert === '1';
     const badge = document.getElementById('verticalBadge');
@@ -431,17 +447,17 @@
     badge.className   = 'vertical-badge' + (vertical ? ' active' : '');
 
     const hEl = document.getElementById('heightVal');
-    const dist = parseInt(tofDist);
-    if (dist > 0) {
-      hEl.textContent = dist;
-      hEl.className = 'height-value';
+    const h = parseInt(height);
+    if (h > 0) {
+      hEl.textContent = h;
+      hEl.className = 'height-value' + (parseInt(fallState) === 2 ? ' ballistic' : '');
     } else {
       hEl.textContent = '—';
       hEl.className = 'height-value unavailable';
     }
 
     if (sessionActive) {
-      sessionRows.push([ts, roll, pitch, yaw, angle, isVert, tofDist, pwm]);
+      sessionRows.push([ts, roll, pitch, yaw, angle, isVert, height, pwm, fallState, ax, ay, az]);
       updateLog(raw.trim());
       document.getElementById('sampleCount').textContent =
         sessionRows.length + ' sample' + (sessionRows.length !== 1 ? 's' : '') + ' recorded';
@@ -490,7 +506,7 @@
 
   // ── CSV download ──────────────────────────────────────────────────────────
   function downloadCSV() {
-    const header = 'timestamp_ms,roll_deg,pitch_deg,yaw_deg,angle_deg,is_vertical,tof_dist_mm,motor_pwm';
+    const header = 'timestamp_ms,roll_deg,pitch_deg,yaw_deg,angle_deg,is_vertical,height_mm,motor_pwm,fall_state,ax_g,ay_g,az_g';
     const csv = [header, ...sessionRows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url  = URL.createObjectURL(blob);
